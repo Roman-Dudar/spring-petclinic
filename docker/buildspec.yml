@@ -15,6 +15,9 @@ phases:
       - export START_TIME=$( date +%s )
       - echo STARTING TIME = $START_TIME
       - export DOCKER_TAG=$DOCKER_REGISTRY/$PROJECT_NAME:$PROJECT_VERSION
+      - echo "======== Debug info ========"
+      - printenv
+      - echo "======== END Debug info ========"
   build:
     commands:
       - echo "Building docker image"
