@@ -1,0 +1,26 @@
+---
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --region $AWS_REGION --query "Account" --output text)
+      - export DOCKER_REGISTRY=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - export PROJECT_NAME=builders
+      - export PROJECT_VERSION=docker1709
+  pre_build:
+    commands:
+      - echo "Logging into ECR"
+      - $(aws ecr get-login --region $AWS_REGION --no-include-email)
+      - export START_TIME=$( date +%s )
+      - echo STARTING TIME = $START_TIME
+      - export DOCKER_TAG=$DOCKER_REGISTRY/$PROJECT_NAME:$PROJECT_VERSION
+  build:
+    commands:
+      - echo "Building docker image"
+      - docker build -f docker/Dockerfile.builder -t $DOCKER_TAG .
+  post_build:
+    commands:
+      - echo "Build completed in $(( $( date +%s ) - START_TIME ))s"
+      - echo "Pushing docker image into ECR"
+      - docker push $DOCKER_TAG
