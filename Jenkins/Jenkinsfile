@@ -3,7 +3,7 @@ node {
     def pom
     def github = [
             'credentialsId': '8a330b0a-a7dc-47aa-862a-72ac90cfe0d7',
-            'url': 'https://github.com/jglick/simple-maven-project-with-tests.git',
+            'url': 'https://github.com/Roman-Dudar/spring-petclinic',
             'branch': 'master'
     ]
 
@@ -23,6 +23,8 @@ node {
         } else {
             bat(/"${mvnHome}\bin\mvn" -Dmaven.test.failure.ignore clean package/)
         }
+
+        echo "!target/${pom.artifactId}-${pom.version}.jar > .cfignore"
     }
 
     stage('Deploy to pcf') {
@@ -35,9 +37,10 @@ node {
                 manifestChoice: [
                         value: 'jenkinsConfig',
                         appName: 'petclinic-demo',
-                        memory: 512,
+                        memory: 1024,
                         instances: 1,
-                        appPath: "target/${pom.artifactId}-${pom.version}.jar"
+                        path: "target/${pom.artifactId}-${pom.version}.jar",
+                        buildpack: 'https://github.com/cloudfoundry/java-buildpack.git#v4.5'
                 ]
         )
     }
