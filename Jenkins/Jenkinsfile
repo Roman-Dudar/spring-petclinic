@@ -1,50 +1,49 @@
-node {
-    def mvnHome
-    def pom
-    def github = [
-            'credentialsId': '8a330b0a-a7dc-47aa-862a-72ac90cfe0d7',
-            'url': 'https://github.com/Roman-Dudar/spring-petclinic',
-            'branch': 'master'
-    ]
+pipeline {
 
-    def CF_CREDID = '2d1e3235-6a3c-4faf-9773-3a7876ab70e4'
-
-    stage('Checkout') {
-        git url: github.url, credentialsId: github.credentialsId, branch: github.branch
-        mvnHome = tool 'M3'
-
-        pom = readMavenPom file: 'pom.xml'
+    agent {
+        label 'master'
+    }
+    tools {
+        maven 'M3'
     }
 
-    stage('Build') {
-        // Run the maven build
-        if (isUnix()) {
-            sh "'${mvnHome}/bin/mvn' -Dmaven.test.failure.ignore clean package"
-        } else {
-            bat(/"${mvnHome}\bin\mvn" -Dmaven.test.failure.ignore clean package/)
+    environment {
+        PROJECT_NAME = 'spring-petclinic'    //Use Pipeline Utility Steps
+        PROJECT_VERSION = '1.5.1'
+        PCF_CREDS = credentials('2d1e3235-6a3c-4faf-9773-3a7876ab70e4')
+        NEXUS_CREDS = credentials('2659d244-8f9e-4c1f-aa50-71ed4bf9de28')
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/Roman-Dudar/spring-petclinic',
+                    branch: 'master',
+                    credentialsId: '8a330b0a-a7dc-47aa-862a-72ac90cfe0d7'
+            }
         }
-    }
 
-    stage('Deploy to pcf') {
-        cfPush(
-                target:         'api.run.pivotal.io',
-                organization:   'roman-dudar',
-                cloudSpace:     'development',
-                credentialsId:  CF_CREDID,
-                selfSigned: true,
-                manifestChoice: [
-                        value: 'jenkinsConfig',
-                        appName: 'petclinic-demo',
-                        memory: 1024,
-                        instances: 1,
-                        path: "target/${pom.artifactId}-${pom.version}.jar",
-                        buildpack: 'https://github.com/cloudfoundry/java-buildpack.git#v4.5'
-                ]
-        )
-    }
+        stage('Build & test') {
+            steps { sh 'mvn verify' }
+        }
 
-    stage('Results') {
-        archive "target/${pom.artifactId}-${pom.version}.jar"
-    }
+        stage('Deploy to PCF') {
+            steps {
+                sh "printenv"
+                sh "cf login -u $PCF_CREDS_USR -p \"$PCF_CREDS_PSW\" -a 'api.run.pivotal.io' -o roman-dudar -s development"
+                sh "cf push $PROJECT_NAME -p target/${PROJECT_NAME}-${PROJECT_VERSION}.jar --hostname sfhdgibvbcids"
+            }
+        }
 
+        stage('Cleanup') {
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                    input 'Finished?'
+                    sh "cf delete $PROJECT_NAME -f"
+                }
+            }
+        }
+
+    }
 }
